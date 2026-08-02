@@ -68,5 +68,5 @@ async def delete_task(id: int):
     for i, task in enumerate(tasks):
         if task.id == id:
             tasks.pop(i)
-            return
+            return HTTPException
     raise HTTPException(status_code=404, detail=f"Task {id} not found")

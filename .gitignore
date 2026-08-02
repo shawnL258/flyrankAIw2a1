@@ -12,3 +12,6 @@ __pycache__/
 
 # Environment variables
 .env
+
+# Test scripts
+test_endpoints.ps1
