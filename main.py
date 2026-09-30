@@ -1,12 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 import database
 
 app = FastAPI()
-class Task(BaseModel):
-    id: int
-    title: str
-    done: bool = False
+
+@app.exception_handler(RequestValidationError)
+async def handle_request_validation(request: Request, exc: RequestValidationError):
+    response = await request_validation_exception_handler(request, exc)
+    route = request.scope.get("route")
+    if (
+        request.method == "PUT"
+        and getattr(route, "path", None) == "/tasks/{id}"
+        and all(error["loc"][0] == "body" for error in exc.errors())
+    ):
+        response.status_code = 400
+    return response
 
 @app.get("/")
 async def root():
@@ -15,14 +25,6 @@ async def root():
 @app.get("/health")
 async def health():
    return {"status": "ok"}
-
-tasks = [
-    Task(id=1, title="Buy groceries", done=False),
-    Task(id=2, title="Read FastAPI docs", done=True),
-    Task(id=3, title="Learn FastAPI", done=False),
-    Task(id=4, title="Build a FastAPI app", done=False),
-    Task(id=5, title="Deploy the FastAPI app", done=False),
-]
 
 @app.get("/tasks")
 async def read_tasks():
@@ -58,17 +60,13 @@ async def update_task(id: int, task_in: TaskUpdate):
     if task_in.title == "" or task_in.title is None:
         raise HTTPException(status_code=400, detail="Title cannot be empty")
 
-    for task in tasks:
-        if task.id == id:
-            task.title = task_in.title
-            task.done = task_in.done
-            return task
-    raise HTTPException(status_code=404, detail=f"Task {id} not found")
+    if database.where_task(id) is None:
+        raise HTTPException(status_code=404, detail=f"Task {id} not found")
+    return database.update_task(id, task_in.title, task_in.done)
 
 @app.delete("/tasks/{id}", status_code=204)
 async def delete_task(id: int):
-    for i, task in enumerate(tasks):
-        if task.id == id:
-            tasks.pop(i)
-            return
-    raise HTTPException(status_code=404, detail=f"Task {id} not found")
+    if database.where_task(id) is None:
+        raise HTTPException(status_code=404, detail=f"Task {id} not found")
+
+    return database.delete_task(id)

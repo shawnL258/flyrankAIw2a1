@@ -59,6 +59,31 @@ def create_task(title: str, done: bool):
     finally:
         close_database(connection)
 
+def update_task(id: int, title: str, done: bool):
+    connection = open_database()
+    try:
+        cursor = connection.execute(
+            "UPDATE tasks SET title = ?, done = ? WHERE id = ?", (title, done, id)
+        )
+        connection.commit()
+        return {
+            "id" : id,
+            "title" : title,
+            "done" : done
+        }
+    finally:
+        close_database(connection)
+
+def delete_task(id: int):
+    connection = open_database()
+    try:
+        cursor = connection.execute(
+            "DELETE FROM tasks WHERE id = ?", (id,)
+        )
+        connection.commit()
+    finally:
+        close_database(connection)
+
 def select_task():
     connection = open_database()
     mapped_records_to_json(connection)
