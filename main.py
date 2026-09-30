@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import database
 
 app = FastAPI()
 class Task(BaseModel):
@@ -25,30 +26,31 @@ tasks = [
 
 @app.get("/tasks")
 async def read_tasks():
-    return tasks
+    get_task = database.select_task()
+    if not get_task:
+        raise HTTPException(status_code=404, detail="Tasks not found")
+    return get_task
 
 @app.get("/tasks/{id}")
-async def read_tasks(id: int):
-    for task in tasks:
-        if task.id == id:
-            return task
-    raise HTTPException(status_code=404, detail=f"Task {id} not found")
+async def read_task(id: int):
+    get_task = database.where_task(id)
+    if not get_task:
+        raise HTTPException(status_code=404, detail=f"Task {id} not found")
+
+    return get_task
 
 class TaskCreate(BaseModel):
-    title: str
+    title: str | None = None
 
 @app.post("/tasks", status_code=201)
 async def create_task(task_in: TaskCreate):
+
     if task_in.title == "" or task_in.title is None:
         raise HTTPException(status_code=400, detail="Title cannot be empty")
-
-    next_id = max(t.id for t in tasks) + 1 if tasks else 1
-    new_task = Task(id=next_id, title=task_in.title, done=False)
-    tasks.append(new_task)
-    return new_task
+    return database.create_task(task_in.title, False)
 
 class TaskUpdate(BaseModel):
-    title: str
+    title: str | None = None
     done: bool
 
 @app.put("/tasks/{id}")
@@ -68,5 +70,5 @@ async def delete_task(id: int):
     for i, task in enumerate(tasks):
         if task.id == id:
             tasks.pop(i)
-            return HTTPException
+            return
     raise HTTPException(status_code=404, detail=f"Task {id} not found")

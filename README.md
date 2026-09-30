@@ -1,71 +1,101 @@
 
 # Task API
 
-A simple RESTful API built with **FastAPI** for managing tasks. Created as a small assignment project to demonstrate CRUD operations with proper HTTP status codes.
+A FastAPI learning project for task CRUD operations, currently being migrated from an in-memory list to SQLite.
 
-## Tech Stack
+## Current implementation
 
-- **Python 3.12**
-- **FastAPI** — async web framework
-- **Pydantic** — request/response validation
-- **Uvicorn** — ASGI server
+- `GET /tasks` and `GET /tasks/{id}` read from `tasks.db`.
+- `POST`, `PUT`, and `DELETE` still modify the separate in-memory list in `main.py`. Their changes do not appear in database reads and reset when the app restarts.
+- Database initialization is manual: run `python database.py` before starting the API for the first time.
 
-## Getting Started
+## Tech stack
 
-### 1. Clone the repository
+- Python 3.12
+- FastAPI and Pydantic for routes and request validation
+- Uvicorn for serving the app
+- SQLite through Python's built-in `sqlite3` module; SQLModel and a separate database server are not required
 
-```bash
-git clone https://github.com/<your-username>/flyrankAI.git
-cd flyrankAI
-```
+## Getting started (Windows PowerShell)
 
-### 2. Create and activate a virtual environment
+Open a terminal in the project folder.
 
-```bash
+### 1. Create and activate a virtual environment
+
+Skip creation if you already have `venv`.
+
+```powershell
 python -m venv venv
-
-# Windows
-.\venv\Scripts\activate
-
-# macOS / Linux
-source venv/bin/activate
+.\venv\Scripts\Activate.ps1
 ```
 
-### 3. Install dependencies
+### 2. Install dependencies
 
-```bash
-pip install fastapi uvicorn
+```powershell
+python -m pip install fastapi uvicorn
 ```
 
-### 4. Run the server
+### 3. Initialize the database
 
-```bash
-uvicorn main:app --reload
+```powershell
+python database.py
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
+This creates `tasks.db` beside `database.py`, creates the `tasks` table if needed, and inserts five example tasks only if the table is empty. Repeating the command preserves existing rows without adding duplicate examples. The app does not currently call `init_db()` automatically at startup.
 
-## API Endpoints
+The lesson's Step 0 asks for three example tasks; the current code seeds five.
 
-| Method   | Endpoint       | Description          | Status Codes |
-|----------|----------------|----------------------|--------------|
-| `GET`    | `/`            | API info             | `200`        |
-| `GET`    | `/health`      | Health check         | `200`        |
-| `GET`    | `/tasks`       | List all tasks       | `200`        |
-| `GET`    | `/tasks/{id}`  | Get a task by ID     | `200`, `404` |
-| `POST`   | `/tasks`       | Create a new task    | `201`, `400` |
-| `PUT`    | `/tasks/{id}`  | Update a task        | `200`, `400`, `404` |
-| `DELETE` | `/tasks/{id}`  | Delete a task        | `204`, `404` |
+### 4. Start the API
 
-## Usage Examples (Curl with Swagger screenshots)
-
-### Create a task
-
-```bash
-curl -X POST http://127.0.0.1:8000/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Learn FastAPI"}'
+```powershell
+python -m uvicorn main:app --reload
 ```
+
+The API runs at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+## Database structure
+
+| Column | Declaration | Purpose |
+|---|---|---|
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Automatically assigned task ID |
+| `title` | `TEXT NOT NULL` | Task description |
+| `done` | `BOOLEAN NOT NULL` | Completion state, stored as `0` or `1` |
+
+Database GET responses currently expose `done` as `0` or `1`. In-memory write responses use JSON booleans (`false` or `true`).
+
+## API endpoints
+
+| Method | Endpoint | Storage / purpose | Status codes |
+|---|---|---|---|
+| `GET` | `/` | API information | `200` |
+| `GET` | `/health` | App health response | `200` |
+| `GET` | `/tasks` | List database tasks | `200`, `404` if empty |
+| `GET` | `/tasks/{id}` | Read one database task | `200`, `404`, `422` |
+| `POST` | `/tasks` | Create an in-memory task | `201`, `400`, `422` |
+| `PUT` | `/tasks/{id}` | Update an in-memory task | `200`, `400`, `404`, `422` |
+| `DELETE` | `/tasks/{id}` | Delete an in-memory task | `204`, `404`, `422` |
+
+An empty title (`""`) returns `400`. Missing required fields, null titles, and non-integer path IDs return FastAPI validation errors (`422`). Whitespace-only titles are currently accepted. PUT requires both `title` and `done`.
+
+A missing task returns `404`, not `400`, with a response such as:
+
+```json
+{"detail":"Task 999 not found"}
+```
+
+## Read checks
+
+With the server running, use a second PowerShell terminal:
+
+```powershell
+curl.exe -i http://127.0.0.1:8000/tasks
+curl.exe -i http://127.0.0.1:8000/tasks/1
+curl.exe -i http://127.0.0.1:8000/tasks/999
+```
+
+On the current seeded database, the expected statuses are `200`, `200`, and `404`, respectively. These were verified against the app using FastAPI's test client.
+
+Example response for `/tasks/1`:
 
 ```json
 {"id": 6, "title": "Learn FastAPI", "done": false}
@@ -84,10 +114,8 @@ curl http://127.0.0.1:8000/tasks
 
 ### Update a task
 
-```bash
-curl -X PUT http://127.0.0.1:8000/tasks/1 \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Buy groceries", "done": true}'
+```powershell
+Invoke-RestMethod -Uri 'http://127.0.0.1:8000/tasks/1' -Method Put -ContentType 'application/json' -Body '{"title":"Buy groceries","done":true}'
 ```
 <img width="1225" height="826" alt="Screenshot 2026-08-01 210542" src="https://github.com/user-attachments/assets/6e989d2b-8bd9-4bc8-b1a4-9d1a46543082" />
 
@@ -107,17 +135,21 @@ FastAPI auto-generates interactive API documentation:
 - **Swagger UI** — [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc** — [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
-## Project Structure
+## Project structure
 
-```
+```text
 flyrankAI/
-├── main.py          # API application
-├── .gitignore
-├── README.md
-└── venv/            # Virtual environment (not tracked)
+|-- main.py        # FastAPI routes, models, and in-memory write operations
+|-- database.py    # SQLite connections, initialization, and read queries
+|-- tasks.db       # Database file generated by initialization
+|-- README.md
+|-- .gitignore
+`-- venv/          # Local Python environment
 ```
 
-## Notes
+## Remaining database migration work
 
-- Tasks are stored **in memory** — data resets when the server restarts.
-- The app ships with 5 sample tasks for quick testing.
+- Move POST, PUT, and DELETE operations into SQLite so reads and writes share storage.
+- Call database initialization during app startup.
+- Align the five seed tasks with the lesson's three-task checkpoint.
+- Align response formatting with the lesson: it specifies `{"error":"Task not found"}`, while the app currently uses FastAPI's `detail` field and includes the ID.
