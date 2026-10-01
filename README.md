@@ -192,9 +192,28 @@ flyrankAI/
 `-- venv/          # Local Python environment
 ```
 
-## Remaining database migration work
+## STAGE 4 CHECKPOINT:
+During my testing inside SQLite DB Browser I tested all the sample queries given. I also tried my own query like 
+INSERT INTO tasks(title, done) VALUES ("Code with Claude", 0);
+SELECT * FROM tasks;
+This task had a id = 11
 
-- Move PUT and DELETE operations into SQLite so all endpoints share storage.
-- Call database initialization during app startup.
-- Align the five seed tasks with the lesson's three-task checkpoint.
-- Align response formatting with the lesson: it specifies `{"error":"Task not found"}`, while the app currently uses FastAPI's `detail` field and includes the ID.
+and then I ran it through my API without any server restart using the GET \tasks\{id} endpoint
+
+it returned
+{
+  "id": 11,
+  "title": "Code with Claude",
+  "done": 0
+} with a 200 response
+
+Screenshot proof:
+<img width="503" height="382" alt="Screenshot 2026-10-01 215159" src="https://github.com/user-attachments/assets/67797946-80dc-49e4-8df5-64ca8e8e63de" />
+
+
+## Why SQLite is the Database chosen in this project
+
+SQLite is a self-contained serverless Relational Database Management System that is light-weight and perfect for small projects like this.
+Unlike traditional RDBMS like PostgreSQL or MySQL, the application has to use TCP/IP in order to access the use of the database. They follow a Client/Server Architecture
+SQLite however is serverless, meaning you edit directly in the database, no server in between to activate or do TCP/IP.
+This makes it perfect for applications that need a lightweight database like Phone Apps as an example. 
