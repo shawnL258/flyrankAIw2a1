@@ -186,7 +186,22 @@ flyrankAI/
 `-- venv/          # Local Python environment
 ```
 
-## Stage 4: SQL by hand (original demonstration)
+## Stage 4: SQL by hand
+List every tasks
+<img width="586" height="453" alt="Screenshot 2026-10-01 205722" src="https://github.com/user-attachments/assets/975553bf-e3b7-405f-8bf4-b82c1c47a10c" />
+
+Only completed tasks
+<img width="328" height="263" alt="Screenshot 2026-10-01 205804" src="https://github.com/user-attachments/assets/dca06d71-644a-4a30-9383-454c87f2f6cf" />
+
+How many tasks are there?
+<img width="270" height="248" alt="Screenshot 2026-10-01 205852" src="https://github.com/user-attachments/assets/2232eb4e-2868-4fdc-9a75-667bda8b0de8" />
+
+Mark every task completed
+<img width="372" height="473" alt="Screenshot 2026-10-01 210011" src="https://github.com/user-attachments/assets/2d612a62-4b8e-4541-b125-7d50bd2011cc" />
+
+Delete all completed tasks
+<img width="480" height="476" alt="Screenshot 2026-10-01 210355" src="https://github.com/user-attachments/assets/fecff8dc-fca6-4123-8a2d-969254203d8f" />
+
 During my testing inside SQLite DB Browser I tested all the sample queries given. I also tried my own query like 
 INSERT INTO tasks(title, done) VALUES ("Code with Claude", 0);
 SELECT * FROM tasks;
@@ -194,7 +209,7 @@ This task had a id = 11
 
 and then I ran it through my API without any server restart using the GET /tasks/{id} endpoint
 
-The original demonstration returned the following response (the current API now serializes `done` as a boolean):
+It returned the following response (the current API now serializes `done` as a boolean):
 
 ```json
 {
