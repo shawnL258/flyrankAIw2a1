@@ -3,6 +3,9 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "tasks.db"
 
+def check_database():
+    init_db()
+
 def open_database():
     connection = sqlite3.connect(DB_PATH)
     return connection
@@ -35,8 +38,6 @@ def init_db():
                     ("Buy groceries", False),
                     ("Read FastAPI docs", True),
                     ("Learn FastAPI", False),
-                    ("Build a FastAPI app", False),
-                    ("Deploy the FastAPI app", False),
                 ]
             )
             
@@ -88,7 +89,8 @@ def select_task():
     connection = open_database()
     mapped_records_to_json(connection)
     try:
-        return connection.execute("SELECT * FROM tasks").fetchall()
+        rows = connection.execute("SELECT * FROM tasks").fetchall()
+        return [{**dict(row), "done": bool(row["done"])} for row in rows]
     finally:
         close_database(connection)
 
@@ -98,7 +100,7 @@ def where_task(tasks_id):
 
     try:
         row = connection.execute("SELECT * FROM tasks WHERE id = ?", (tasks_id,)).fetchone()
-        return dict(row) if row is not None else None
+        return {**dict(row), "done": bool(row["done"])} if row is not None else None
     finally:
         close_database(connection)
 

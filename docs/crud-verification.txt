@@ -1,0 +1,111 @@
+HTTP verification — 2026-10-02
+Clean source copy; installed project Python environment; temporary tasks.db.
+Commands below use curl.exe -i. No production data changed.
+
+GET /tasks
+HTTP/1.1 200 OK
+date: Fri, 02 Oct 2026 01:43:55 GMT
+server: uvicorn
+content-length: 142
+content-type: application/json
+
+[{"id":1,"title":"Buy groceries","done":false},{"id":2,"title":"Read FastAPI docs","done":true},{"id":3,"title":"Learn FastAPI","done":false}]
+
+POST /tasks {"title": "HTTP persistence check"}
+HTTP/1.1 201 Created
+date: Fri, 02 Oct 2026 01:43:55 GMT
+server: uvicorn
+content-length: 54
+content-type: application/json
+
+{"id":4,"title":"HTTP persistence check","done":false}
+
+GET /tasks/4
+HTTP/1.1 200 OK
+date: Fri, 02 Oct 2026 01:43:55 GMT
+server: uvicorn
+content-length: 54
+content-type: application/json
+
+{"id":4,"title":"HTTP persistence check","done":false}
+
+PUT /tasks/4 {"title": "HTTP updated", "done": true}
+HTTP/1.1 200 OK
+date: Fri, 02 Oct 2026 01:43:55 GMT
+server: uvicorn
+content-length: 43
+content-type: application/json
+
+{"id":4,"title":"HTTP updated","done":true}
+
+SERVER STOPPED AND RESTARTED (new Uvicorn process, same temporary file)
+GET /tasks/4
+HTTP/1.1 200 OK
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-length: 43
+content-type: application/json
+
+{"id":4,"title":"HTTP updated","done":true}
+
+GET /tasks
+HTTP/1.1 200 OK
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-length: 186
+content-type: application/json
+
+[{"id":1,"title":"Buy groceries","done":false},{"id":2,"title":"Read FastAPI docs","done":true},{"id":3,"title":"Learn FastAPI","done":false},{"id":4,"title":"HTTP updated","done":true}]
+
+DELETE /tasks/4
+HTTP/1.1 204 No Content
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-type: application/json
+
+
+
+GET /tasks/4
+HTTP/1.1 404 Not Found
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-length: 26
+content-type: application/json
+
+{"error":"Task not found"}
+
+GET /tasks
+HTTP/1.1 200 OK
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-length: 142
+content-type: application/json
+
+[{"id":1,"title":"Buy groceries","done":false},{"id":2,"title":"Read FastAPI docs","done":true},{"id":3,"title":"Learn FastAPI","done":false}]
+
+POST /tasks {"title": []}
+HTTP/1.1 400 Bad Request
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-length: 32
+content-type: application/json
+
+{"error":"Invalid request body"}
+
+PUT /tasks/1 {}
+HTTP/1.1 400 Bad Request
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-length: 32
+content-type: application/json
+
+{"error":"Invalid request body"}
+
+PUT /tasks/999 {"title": "Missing", "done": false}
+HTTP/1.1 404 Not Found
+date: Fri, 02 Oct 2026 01:43:56 GMT
+server: uvicorn
+content-length: 26
+content-type: application/json
+
+{"error":"Task not found"}

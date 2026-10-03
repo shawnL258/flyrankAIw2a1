@@ -187,7 +187,7 @@ flyrankAI/
 ```
 
 ## Stage 4: SQL by hand
-List every tasks
+List all tasks
 <img width="586" height="453" alt="Screenshot 2026-10-01 205722" src="https://github.com/user-attachments/assets/975553bf-e3b7-405f-8bf4-b82c1c47a10c" />
 
 Only completed tasks
@@ -202,12 +202,14 @@ Mark every task completed
 Delete all completed tasks
 <img width="480" height="476" alt="Screenshot 2026-10-01 210355" src="https://github.com/user-attachments/assets/fecff8dc-fca6-4123-8a2d-969254203d8f" />
 
-During my testing inside SQLite DB Browser I tested all the sample queries given. I also tried my own query like 
-INSERT INTO tasks(title, done) VALUES ("Code with Claude", 0);
-SELECT * FROM tasks;
-This task had a id = 11
+I ran all the sample queries in DB Browser for SQLite. I also inserted a task and listed the rows:
 
-and then I ran it through my API without any server restart using the GET /tasks/{id} endpoint
+```sql
+INSERT INTO tasks (title, done) VALUES ('Code with Claude', 0);
+SELECT * FROM tasks;
+```
+
+The SELECT result included the new task with ID 11. After saving the database changes, I fetched `/tasks/11` through the API without restarting the server.
 
 It returned the following response (the current API now serializes `done` as a boolean):
 
