@@ -1,13 +1,13 @@
 # Task API
 
-A FastAPI learning project for task CRUD operations, currently being migrated from an in-memory list to SQLite.
+A FastAPI learning project for task CRUD operations, using SQLite for all task CRUD operations.
 
 ## Current implementation
 
-- `GET /tasks` and `GET /tasks/{id}` read from `tasks.db`.
-- `POST /tasks` inserts into SQLite, commits the change, and returns the generated ID with `done: false`. Created tasks survive app restarts.
-- `PUT` and `DELETE` still modify the separate in-memory list in `main.py`. Their changes do not appear in database reads and reset when the app restarts. A task created through POST is not added to that list, so PUT and DELETE cannot modify it yet.
-- Database initialization is manual: run `python database.py` before starting the API for the first time.
+- GET, POST, PUT, and DELETE all read or modify `tasks.db` through parameterized SQL.
+- Startup creates the database and table if missing, then seeds three examples if the table is empty. Existing nonempty databases retain their tasks.
+- Changes survive server restarts. Committed DB Browser changes appear on the next API request without restarting.
+- SQLite stores completion as 0/1; API responses consistently use JSON booleans.
 
 ## Tech stack
 
@@ -32,24 +32,18 @@ python -m venv venv
 ### 2. Install dependencies
 
 ```powershell
-python -m pip install fastapi uvicorn
+python -m pip install -r requirements.txt
 ```
 
-### 3. Initialize the database
-
-```powershell
-python database.py
-```
-
-This creates `tasks.db` beside `database.py`, creates the `tasks` table if needed, and inserts five example tasks only if the table is empty. Repeating the command preserves existing rows without adding duplicate examples. The app does not currently call `init_db()` automatically at startup.
-
-The lesson's Step 0 asks for three example tasks; the current code seeds five.
-
-### 4. Start the API
+### 3. Start the API
 
 ```powershell
 python -m uvicorn main:app --reload
 ```
+
+No separate database setup command is needed. Startup creates `tasks.db` beside `database.py` and ensures the `tasks` table exists, even when the file already exists. Three examples are inserted only when the table is empty; repeated starts do not duplicate existing tasks. If you delete every task, the next startup seeds the empty table again.
+
+The database is git-ignored so a fresh clone starts with its own data. An older local database may contain more than three rows; startup deliberately preserves them.
 
 The API runs at [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
@@ -61,7 +55,7 @@ The API runs at [http://127.0.0.1:8000](http://127.0.0.1:8000).
 | `title` | `TEXT NOT NULL` | Task description |
 | `done` | `BOOLEAN NOT NULL` | Completion state, stored as `0` or `1` |
 
-Database GET responses currently expose `done` as `0` or `1`. POST and PUT responses use JSON booleans (`false` or `true`).
+All task responses expose `done` as a JSON boolean (`false` or `true`).
 
 ## API endpoints
 
@@ -69,20 +63,20 @@ Database GET responses currently expose `done` as `0` or `1`. POST and PUT respo
 |---|---|---|---|
 | `GET` | `/` | API information | `200` |
 | `GET` | `/health` | App health response | `200` |
-| `GET` | `/tasks` | List database tasks | `200`, `404` if empty |
+| `GET` | `/tasks` | List database tasks | `200` (empty table returns `[]`) |
 | `GET` | `/tasks/{id}` | Read one database task | `200`, `404`, `422` |
-| `POST` | `/tasks` | Create a database task | `201`, `400`, `422` |
-| `PUT` | `/tasks/{id}` | Update an in-memory task | `200`, `400`, `404`, `422` |
-| `DELETE` | `/tasks/{id}` | Delete an in-memory task | `204`, `404`, `422` |
+| `POST` | `/tasks` | Create a database task | `201`, `400` |
+| `PUT` | `/tasks/{id}` | Update a database task | `200`, `400`, `404`, `422` |
+| `DELETE` | `/tasks/{id}` | Delete a database task | `204`, `404`, `422` |
 
 POST accepts a JSON object containing `title`; clients do not need to send `done`. A missing, null, or empty title (`""`) returns `400`. New tasks always start with `done: false`.
 
-PUT requires `done`; when `done` is valid, a missing, null, or empty title returns `400`. Missing `done`, invalid field types, non-integer path IDs, or an absent request body produce validation errors (`422`). Whitespace-only titles are currently accepted.
+PUT requires `title` and `done`. Invalid POST/PUT bodies, including missing fields, invalid field types, absent bodies, and malformed JSON, return `400` with a JSON error message. Non-integer path IDs return `422`. Whitespace-only titles are currently accepted.
 
 A missing task returns `404`, not `400`, with a response such as:
 
 ```json
-{"detail":"Task 999 not found"}
+{"error":"Task not found"}
 ```
 
 ## Read checks
@@ -100,7 +94,7 @@ On the current seeded database, the expected statuses are `200`, `200`, and `404
 Example response for `/tasks/1` on a freshly initialized database:
 
 ```json
-{"id":1,"title":"Buy groceries","done":0}
+{"id":1,"title":"Buy groceries","done":false}
 ```
 
 ## Usage examples and screenshots
@@ -113,10 +107,10 @@ The existing Swagger screenshots are retained below as earlier API evidence. The
 Invoke-RestMethod -Uri 'http://127.0.0.1:8000/tasks' -Method Post -ContentType 'application/json' -Body '{"title":"Learn FastAPI"}'
 ```
 
-Returns **201** with the created task. On a fresh database with five seeds, the response is:
+Returns **201** with the created task. On a fresh database with three seeds, the response is:
 
 ```json
-{"id":6,"title":"Learn FastAPI","done":false}
+{"id":4,"title":"Learn FastAPI","done":false}
 ```
 
 The ID depends on existing database rows.
@@ -135,7 +129,7 @@ curl.exe -i http://127.0.0.1:8000/tasks
 
 ### Update a task
 
-Returns **200** for an ID present in the in-memory list, or **404** when absent. This currently does not change SQLite.
+Returns **200** with the updated task, or **404** when absent. The change is committed to SQLite and is immediately visible through GET.
 
 ```powershell
 Invoke-RestMethod -Uri 'http://127.0.0.1:8000/tasks/1' -Method Put -ContentType 'application/json' -Body '{"title":"Buy groceries","done":true}'
@@ -144,7 +138,7 @@ Invoke-RestMethod -Uri 'http://127.0.0.1:8000/tasks/1' -Method Put -ContentType 
 
 ### Delete a task
 
-This removes a task from the in-memory list only. The database copy remains visible through GET.
+This deletes the task from SQLite. A later GET for that ID returns **404**.
 
 ```powershell
 curl.exe -i -X DELETE http://127.0.0.1:8000/tasks/1
@@ -171,7 +165,7 @@ To verify persistence:
 3. Stop Uvicorn with Ctrl+C and restart it with `python -m uvicorn main:app --reload`.
 4. Fetch the same IDs again. Both tasks should still exist.
 
-Running `python database.py` again should not duplicate the seeds while the table contains rows. Run PUT and DELETE checks separately: their storage has not yet been migrated.
+Repeated startup preserves existing tasks without duplicating seeds while the table contains rows.
 
 ## Interactive Docs
 
@@ -184,36 +178,51 @@ FastAPI auto-generates interactive API documentation:
 
 ```text
 flyrankAI/
-|-- main.py        # FastAPI routes, models, and in-memory update/delete operations
-|-- database.py    # SQLite connections, initialization, inserts, and reads
+|-- main.py        # FastAPI routes, startup, models, and error handling
+|-- database.py    # SQLite initialization and all CRUD queries
 |-- tasks.db       # Database file generated by initialization
 |-- README.md
 |-- .gitignore
 `-- venv/          # Local Python environment
 ```
 
-## STAGE 4 CHECKPOINT:
+## Stage 4: SQL by hand (original demonstration)
 During my testing inside SQLite DB Browser I tested all the sample queries given. I also tried my own query like 
 INSERT INTO tasks(title, done) VALUES ("Code with Claude", 0);
 SELECT * FROM tasks;
 This task had a id = 11
 
-and then I ran it through my API without any server restart using the GET \tasks\{id} endpoint
+and then I ran it through my API without any server restart using the GET /tasks/{id} endpoint
 
-it returned
+The original demonstration returned the following response (the current API now serializes `done` as a boolean):
+
+```json
 {
   "id": 11,
   "title": "Code with Claude",
   "done": 0
-} with a 200 response
+}
+```
+
+Status: **200**.
 
 Screenshot proof:
 <img width="503" height="382" alt="Screenshot 2026-10-01 215159" src="https://github.com/user-attachments/assets/67797946-80dc-49e4-8df5-64ca8e8e63de" />
 
 
-## Why SQLite is the Database chosen in this project
+## Why SQLite
 
-SQLite is a self-contained serverless Relational Database Management System that is light-weight and perfect for small projects like this.
-Unlike traditional RDBMS like PostgreSQL or MySQL, the application has to use TCP/IP in order to access the use of the database. They follow a Client/Server Architecture
-SQLite however is serverless, meaning you edit directly in the database, no server in between to activate or do TCP/IP.
-This makes it perfect for applications that need a lightweight database like Phone Apps as an example. 
+SQLite keeps this small project's data in a single file, needs no separate database server, and preserves tasks across restarts. Python includes `sqlite3`, so no additional database driver is required. The API and DB Browser read the same file; click **Write Changes** in DB Browser to commit edits before checking the API.
+
+## Verification
+
+Install test dependencies and run the isolated regression checks:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+```
+
+Tests use temporary databases and do not modify your own `tasks.db`. They cover startup, exactly three seeds, missing-table recovery, parameter binding, CRUD, restart persistence, response types, and error codes.
+
+See [the HTTP verification transcript](docs/crud-verification.txt) for a real `curl -i` cycle against a separate server and temporary database, including a full process restart. The clean-source check uses a copy of the application with the installed Python environment; it is not a fresh dependency installation or proof that unpushed changes are already on GitHub.
