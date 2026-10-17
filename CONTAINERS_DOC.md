@@ -17,3 +17,6 @@ Stage 3:
 POST, PUT, and DELETE in /tasks endpoint returning all the right corresponding endpoints
 <img width="921" height="372" alt="image" src="https://github.com/user-attachments/assets/a8edc112-057f-4e65-8387-988c690e882b" />
 
+Stage 4:
+Made a DockerFile and Created TEST1TASK, TEST2TASK, and TEST3TASK then compose down and up to check persistance
+<img width="912" height="422" alt="Screenshot 2026-10-17 221124" src="https://github.com/user-attachments/assets/159e284f-8c37-4a71-bc68-7d71f7bd64e3" />
