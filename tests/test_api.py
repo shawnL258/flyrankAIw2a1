@@ -1,35 +1,48 @@
-import sqlite3
-import tempfile
 import unittest
-from pathlib import Path
 
+import psycopg
 from fastapi.testclient import TestClient
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 import database
 from main import app
 
 
+TEST_DB = "tasks_test"
+
+
+def prepare_test_database():
+    """Point the app at a throwaway database so tests never touch real tasks."""
+    info = conninfo_to_dict(database.database_url())
+    admin = make_conninfo(**{**info, "dbname": "postgres"})
+    with psycopg.connect(admin, autocommit=True) as connection:
+        exists = connection.execute(
+            "SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB,)
+        ).fetchone()
+        if not exists:
+            connection.execute(f'CREATE DATABASE "{TEST_DB}"')
+    return make_conninfo(**{**info, "dbname": TEST_DB})
+
+
 class DatabaseApiTests(unittest.TestCase):
     def setUp(self):
-        self.folder = tempfile.TemporaryDirectory()
-        self.original_path = database.DB_PATH
-        database.DB_PATH = Path(self.folder.name) / "tasks.db"
+        self.original_url = database.database_url()
+        database.database_url = lambda url=prepare_test_database(): url
+        with database.open_database() as connection:
+            connection.execute("DROP TABLE IF EXISTS tasks")
 
     def tearDown(self):
-        database.DB_PATH = self.original_path
-        self.folder.cleanup()
+        database.database_url = lambda url=self.original_url: url
 
-    def test_startup_creates_file_table_and_three_seeds_without_duplicates(self):
+    def test_startup_creates_table_and_three_seeds_without_duplicates(self):
         for _ in range(3):
             with TestClient(app) as client:
-                self.assertTrue(database.DB_PATH.exists())
                 response = client.get("/tasks")
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(len(response.json()), 3)
                 self.assertTrue(all(type(t["done"]) is bool for t in response.json()))
 
-    def test_existing_file_without_table_is_initialized(self):
-        sqlite3.connect(database.DB_PATH).close()
+    def test_existing_database_without_table_is_initialized(self):
         with TestClient(app) as client:
             self.assertEqual(len(client.get("/tasks").json()), 3)
 

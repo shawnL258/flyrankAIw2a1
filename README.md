@@ -1,61 +1,67 @@
 # Task API
 
-A FastAPI learning project for task CRUD operations, using SQLite for all task CRUD operations.
+A FastAPI task CRUD API backed by PostgreSQL. The whole stack (API + database) runs in Docker with one command.
 
-## Current implementation
+## Run it (one command)
 
-- GET, POST, PUT, and DELETE all read or modify `tasks.db` through parameterized SQL.
-- Startup creates the database and table if missing, then seeds three examples if the table is empty. Existing nonempty databases retain their tasks.
-- Changes survive server restarts. Committed DB Browser changes appear on the next API request without restarting.
-- SQLite stores completion as 0/1; API responses consistently use JSON booleans.
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```bash
+git clone <this repo> && cd flyrankAI
+cp .env.example .env      # then edit the password in .env
+docker compose up --build
+```
+
+The API is at [http://127.0.0.1:8000](http://127.0.0.1:8000) (Swagger UI at `/docs`). On first start the API creates the `tasks` table and seeds three example tasks only if the table is empty. Data lives in the `taskdata` volume, so it survives `docker compose down` and `up`.
+
+Stop and keep data: `docker compose down`. Stop and wipe data: `docker compose down -v`.
+
+## Configuration (`.env`)
+
+Copy [`.env.example`](.env.example) to `.env`. `.env` is git-ignored; never commit it.
+
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credentials and database name for the `db` container |
+| `DATABASE_URL` | Connection string used when running the API on your machine (`localhost:5433`). Inside compose the API gets its own URL pointing at the `db` service. |
+
+The database is published on host port **5433** (container port 5432) so it does not clash with a local PostgreSQL install.
 
 ## Tech stack
 
-- Python 3.12
-- FastAPI and Pydantic for routes and request validation
-- Uvicorn for serving the app
-- SQLite through Python's built-in `sqlite3` module; SQLModel and a separate database server are not required
+- Python 3.12, FastAPI, Pydantic, Uvicorn
+- PostgreSQL 17 (official `postgres:17` image) through `psycopg` 3 with parameterized queries (`%s`)
+- Docker + Docker Compose, config via `.env` (`python-dotenv` for local runs)
 
-## Getting started (Windows PowerShell)
+`postgres:17` is pinned on purpose: the `latest` image (18+) expects the volume mounted at `/var/lib/postgresql`, and mounting `/var/lib/postgresql/data` makes the container exit.
 
-Open a terminal in the project folder.
+## Run without Docker for the API (optional)
 
-### 1. Create and activate a virtual environment
-
-Skip creation if you already have `venv`.
+Start only the database, then run the API from a virtualenv (Windows PowerShell):
 
 ```powershell
+docker compose up -d db
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-```
-
-### 2. Install dependencies
-
-```powershell
 python -m pip install -r requirements.txt
-```
-
-### 3. Start the API
-
-```powershell
 python -m uvicorn main:app --reload
 ```
 
-No separate database setup command is needed. Startup creates `tasks.db` beside `database.py` and ensures the `tasks` table exists, even when the file already exists. Three examples are inserted only when the table is empty; repeated starts do not duplicate existing tasks. If you delete every task, the next startup seeds the empty table again.
+## Database access
 
-The database is git-ignored so a fresh clone starts with its own data. An older local database may contain more than three rows; startup deliberately preserves them.
+```bash
+docker compose exec db psql -U postgres -d tasks
+```
 
-The API runs at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+Then `\dt`, `SELECT * FROM tasks;`, `\q`.
 
 ## Database structure
 
 | Column | Declaration | Purpose |
 |---|---|---|
-| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Automatically assigned task ID |
+| `id` | `SERIAL PRIMARY KEY` | Automatically assigned task ID |
 | `title` | `TEXT NOT NULL` | Task description |
-| `done` | `BOOLEAN NOT NULL` | Completion state, stored as `0` or `1` |
-
-All task responses expose `done` as a JSON boolean (`false` or `true`).
+| `done` | `BOOLEAN NOT NULL` | Completion state |
 
 ## API endpoints
 
@@ -129,7 +135,7 @@ curl.exe -i http://127.0.0.1:8000/tasks
 
 ### Update a task
 
-Returns **200** with the updated task, or **404** when absent. The change is committed to SQLite and is immediately visible through GET.
+Returns **200** with the updated task, or **404** when absent. The change is committed to PostgreSQL and is immediately visible through GET.
 
 ```powershell
 Invoke-RestMethod -Uri 'http://127.0.0.1:8000/tasks/1' -Method Put -ContentType 'application/json' -Body '{"title":"Buy groceries","done":true}'
@@ -138,7 +144,7 @@ Invoke-RestMethod -Uri 'http://127.0.0.1:8000/tasks/1' -Method Put -ContentType 
 
 ### Delete a task
 
-This deletes the task from SQLite. A later GET for that ID returns **404**.
+This deletes the task from PostgreSQL. A later GET for that ID returns **404**.
 
 ```powershell
 curl.exe -i -X DELETE http://127.0.0.1:8000/tasks/1
@@ -178,13 +184,35 @@ FastAPI auto-generates interactive API documentation:
 
 ```text
 flyrankAI/
-|-- main.py        # FastAPI routes, startup, models, and error handling
-|-- database.py    # SQLite initialization and all CRUD queries
-|-- tasks.db       # Database file generated by initialization
-|-- README.md
-|-- .gitignore
-`-- venv/          # Local Python environment
+|-- main.py          # FastAPI routes, startup, models, and error handling
+|-- database.py      # PostgreSQL connection (psycopg) and all CRUD queries
+|-- Dockerfile       # Image for the API
+|-- compose.yaml     # api + db services and the taskdata volume
+|-- .env.example     # Template for .env (committed); .env itself is git-ignored
+|-- tests/           # Regression tests (run against a throwaway Postgres database)
+`-- README.md
 ```
+
+## Proof: curl -i and the database
+
+```text
+$ curl -i http://127.0.0.1:8000/tasks
+HTTP/1.1 200 OK
+server: uvicorn
+content-type: application/json
+
+[{"id":2,"title":"Read FastAPI docs","done":true},{"id":3,"title":"Learn FastAPI","done":false}, ...]
+```
+
+Data in Postgres (`docker compose exec db psql -U postgres -d tasks`):
+
+<img width="607" height="822" alt="psql \dt and SELECT * FROM tasks" src="https://github.com/user-attachments/assets/b13c7659-0538-4671-8ee2-1fe0229a59b2" />
+
+Persistence check: create tasks, run `docker compose down` then `docker compose up`, and the tasks are still returned because the `taskdata` volume keeps them.
+
+## Migration note
+
+Earlier versions stored tasks in SQLite (`tasks.db`). The existing rows were copied into Postgres with their original IDs, and the ID sequence was advanced past the highest ID so new tasks do not collide.
 
 ## Stage 4: SQL by hand
 List all tasks
@@ -227,19 +255,18 @@ Screenshot proof:
 <img width="503" height="382" alt="Screenshot 2026-10-01 215159" src="https://github.com/user-attachments/assets/67797946-80dc-49e4-8df5-64ca8e8e63de" />
 
 
-## Why SQLite
+## Why PostgreSQL in a container
 
-SQLite keeps this small project's data in a single file, needs no separate database server, and preserves tasks across restarts. Python includes `sqlite3`, so no additional database driver is required. The API and DB Browser read the same file; click **Write Changes** in DB Browser to commit edits before checking the API.
+Postgres runs as its own server, so the app and database are separate programs that talk over a connection string kept in `.env`. Running it as a container means no local install, the same version everywhere, and a named volume keeps the data when the container is recreated. Compose starts both services together; the `api` waits for the database healthcheck (`pg_isready`) before starting.
 
 ## Verification
 
-Install test dependencies and run the isolated regression checks:
-
 ```powershell
+docker compose up -d db
 python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests use temporary databases and do not modify your own `tasks.db`. They cover startup, exactly three seeds, missing-table recovery, parameter binding, CRUD, restart persistence, response types, and error codes.
+Tests create and use a separate `tasks_test` database on the same server, so your real tasks are never touched. They cover startup, exactly three seeds, missing-table recovery, parameter binding, CRUD, restart persistence, response types, and error codes.
 
-See [the HTTP verification transcript](docs/crud-verification.txt) for a real `curl -i` cycle against a separate server and temporary database, including a full process restart. The clean-source check uses a copy of the application with the installed Python environment; it is not a fresh dependency installation or proof that unpushed changes are already on GitHub.
+See [the HTTP verification transcript](docs/crud-verification.txt) for an earlier `curl -i` cycle (recorded against the SQLite version; behavior is unchanged).
