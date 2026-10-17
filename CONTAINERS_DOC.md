@@ -9,3 +9,7 @@ Stage 1:
 docker exec postgres then check database tables and selected all rows from tasks after 3 attempts
 <img width="607" height="822" alt="image" src="https://github.com/user-attachments/assets/b13c7659-0538-4671-8ee2-1fe0229a59b2" />
 
+Stage 2:
+Getting 
+<img width="802" height="170" alt="image" src="https://github.com/user-attachments/assets/80b8a497-dd69-4235-bd92-61d687877fda" />
+
