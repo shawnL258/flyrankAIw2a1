@@ -203,16 +203,20 @@ content-type: application/json
 
 [{"id":2,"title":"Read FastAPI docs","done":true},{"id":3,"title":"Learn FastAPI","done":false}, ...]
 ```
+<img width="802" height="170" alt="676674564-80b8a497-dd69-4235-bd92-61d687877fda" src="https://github.com/user-attachments/assets/c1bdbbc8-a90e-4b24-93d3-f48322b0523b" />
 
-Data in Postgres (`docker compose exec db psql -U postgres -d tasks`):
+Data in Postgres (`docker exec flyrankai-db-1 psql -U postgres -d tasks -c "\dt" -c "SELECT * FROM tasks;"`):
 
 <img width="607" height="822" alt="psql \dt and SELECT * FROM tasks" src="https://github.com/user-attachments/assets/b13c7659-0538-4671-8ee2-1fe0229a59b2" />
 
 Persistence check: create tasks, run `docker compose down` then `docker compose up`, and the tasks are still returned because the `taskdata` volume keeps them.
+<img width="912" height="422" alt="676692542-159e284f-8c37-4a71-bc68-7d71f7bd64e3" src="https://github.com/user-attachments/assets/1c9b5901-057e-4846-8be0-6dda7693b4b3" />
 
 ## Migration note
 
 Earlier versions stored tasks in SQLite (`tasks.db`). The existing rows were copied into Postgres with their original IDs, and the ID sequence was advanced past the highest ID so new tasks do not collide.
+
+Check COTAINERS_DOC.md for more info
 
 ## Stage 4: SQL by hand
 List all tasks
